@@ -123,7 +123,7 @@ CREATE TABLE materials (
 
 
 ## Взаимосвязи между таблицами
-![alt text](image.png)
+![alt text](db.png)
 
 ## Разработка
 
