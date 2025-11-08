@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"syscall"
 
 	_ "github.com/lib/pq"
 
@@ -13,25 +14,41 @@ import (
 )
 
 func main() {
-    logr := logger.GetInstance()
+	logger := logger.GetInstance()
 
-    cfg, err := config.Load()
-    if err != nil {
-        logr.Fatalf("config load failed: %v", err)
-    }
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Fatalf("config load failed: %v", err)
+	}
 
-    if err := logr.Initialize(cfg.LogDir, cfg.LogLevel); err != nil {
-        logr.Fatalf("logger initialization failed: %v", err)
-    }
+	if err := logger.Initialize(cfg.LogDir, cfg.LogLevel); err != nil {
+		logger.Fatalf("logger initialization failed: %v", err)
+	}
 
-    logr.Infof("Application starting. LogLevel=%d", cfg.LogLevel)
+	logger.Infof("Application starting. LogLevel=%d", cfg.LogLevel)
 
-    ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-    defer cancel()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
-    app := application.NewApplication()
-    app.Configure(cfg, ctx)
-    app.Run(ctx)
+	defer cancel()
 
-    logr.Info("Application stopped")
+	app := application.NewApplication()
+	err = app.Configure(cfg, logger, ctx)
+	if err != nil {
+		logger.Errorf("failed configure bot %+v", err)
+	}
+
+	logger.Info("bot has been successfully created and configured")
+
+	app.Run(ctx)
+
+	<-ctx.Done()
+
+	logger.Info("Shutting down...")
+
+	if err := app.DB.Close(); err != nil {
+		logger.Errorf("failed to close DB: %v", err)
+	}
+
+	logger.Info("Application stopped")
 }

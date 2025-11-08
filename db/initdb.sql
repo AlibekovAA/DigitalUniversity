@@ -9,7 +9,7 @@ CREATE TABLE groups (
 CREATE TABLE users (
     user_id SERIAL PRIMARY KEY,
     "name" VARCHAR(255) NOT NULL,
-    username VARCHAR(100) UNIQUE,
+    userMax_id BIGINT UNIQUE,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     role_id INT REFERENCES roles(role_id),
@@ -65,3 +65,32 @@ CREATE TABLE materials (
     file_url TEXT NOT NULL,
     uploaded_at TIMESTAMP DEFAULT NOW()
 );
+<<<<<<< Updated upstream
+=======
+
+INSERT INTO roles (role_name)
+VALUES (
+    'Администратор'             
+)
+ON CONFLICT (role_name) DO NOTHING;
+
+INSERT INTO groups (group_name)
+VALUES (
+    'А-05м-24'             
+)
+ON CONFLICT (group_name) DO NOTHING;
+
+INSERT INTO users (name,userMax_id, first_name, last_name, role_id, group_id)
+VALUES (
+    'Иван Василов',
+    88161291,
+    'Иван',
+    'Василов',
+    1,                -- role_id для админа (должен существовать в таблице roles)
+    1              -- или конкретный group_id, если нужен
+)
+ON CONFLICT (userMax_id) DO NOTHING;
+
+
+
+>>>>>>> Stashed changes

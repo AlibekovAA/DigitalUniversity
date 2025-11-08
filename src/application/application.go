@@ -12,41 +12,35 @@ import (
 )
 
 type Application struct {
-    Bot    *maxAPI.Bot
-    DB     *sqlx.DB
-    logger *logger.Logger
+	Bot    *maxAPI.Bot
+	DB     *sqlx.DB
+	logger *logger.Logger
 }
 
 func NewApplication() *Application {
-    return &Application{
-        logger: logger.GetInstance(),
-    }
+	return &Application{}
 }
 
-func (app *Application) Configure(cfg *config.Config, ctx context.Context) error {
-    db, err := database.OpenDB(&cfg.Database)
-    if err != nil {
-        app.logger.Errorf("failed open DB: %v", err)
-        return err
-    }
+func (app *Application) Configure(cfg *config.Config, logger *logger.Logger, ctx context.Context) error {
+	app.logger = logger
 
-    app.DB = db
+	db, err := database.OpenDB(&cfg.Database)
+	if err != nil {
+		return err
+	}
 
-    // bot, err := telegram.NewBot(&cfg.Telegram, app.poller, cfg.Standup.ExcludeList, app.Conversation, db)
-    // if err != nil {
-    //     app.logger.Errorf("failed create telegram bot: %v", err)
-    //     return err
-    // }
+	app.DB = db
 
-    // app.Bot = bot
+	b, err := maxAPI.NewBot(&cfg.MaxAPI, logger, db, ctx)
+	if err != nil {
+		return err
+	}
+	app.Bot = b
 
-    return nil
+	return nil
 }
 
 func (app *Application) Run(ctx context.Context) {
-    // go app.Bot.Start(ctx)
 
-    if err := app.DB.Close(); err != nil {
-        app.logger.Errorf("failed to close DB: %v", err)
-    }
+	app.Bot.Start(ctx)
 }
