@@ -78,22 +78,22 @@ INSERT INTO users (
         group_id
     )
 VALUES (
-        'Иван Василов',
+        'Ivan Vasilov',
         94246618,
-        'Иван',
-        'Василов',
+        'Ivan',
+        'Vasilov',
         (
             SELECT role_id
             FROM roles
-            WHERE role_name = 'teacher'
+            WHERE role_name = 'admin'
         ),
         NULL
     ),
     (
-        'Аслан Алибеков',
+        'Aslan Alibekov',
         83593004,
-        'Аслан',
-        'Алибеков',
+        'Aslan',
+        'Alibekov',
         (
             SELECT role_id
             FROM roles
