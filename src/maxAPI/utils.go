@@ -8,58 +8,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
-	maxbot "github.com/max-messenger/max-bot-api-client-go"
 	"github.com/max-messenger/max-bot-api-client-go/schemes"
 )
-
-func (b *Bot) sendKeyboard(ctx context.Context, keyboard *maxbot.Keyboard, userID int64, msg string) {
-	_, err := b.MaxAPI.Messages.Send(ctx, maxbot.NewMessage().
-		SetUser(userID).
-		AddKeyboard(keyboard).
-		SetText(msg))
-	if err != nil && err.Error() != "" {
-		b.logger.Errorf("Failed to send keyboard: %v", err)
-	}
-}
-
-func (b *Bot) sendMessage(ctx context.Context, userID int64, text string) error {
-	_, err := b.MaxAPI.Messages.Send(ctx, maxbot.NewMessage().
-		SetUser(userID).
-		SetText(text))
-	if err != nil && err.Error() != "" {
-		return err
-	}
-	return nil
-}
-
-func (b *Bot) sendKeyboardByRole(ctx context.Context, userID int64, role string) {
-	var keyboard *maxbot.Keyboard
-	var msg string
-
-	switch role {
-	case "admin":
-		keyboard = GetAdminKeyboard(b.MaxAPI)
-		msg = adminMsg
-	case "teacher":
-		keyboard = GetTeacherKeyboard(b.MaxAPI)
-		msg = teachersMessage
-	case "student":
-		keyboard = GetStudentKeyboard(b.MaxAPI)
-		msg = studentsMessage
-	default:
-		b.logger.Warnf("Unknown role: %q", role)
-		return
-	}
-
-	_, err := b.MaxAPI.Messages.Send(ctx, maxbot.NewMessage().
-		SetUser(userID).
-		AddKeyboard(keyboard).
-		SetText(msg))
-	if err != nil && err.Error() != "" {
-		b.logger.Errorf("Failed to send keyboard: %v", err)
-	}
-}
 
 func (b *Bot) downloadFile(ctx context.Context, fileAtt *schemes.FileAttachment) (string, error) {
 	fileURL := fileAtt.Payload.Url
@@ -141,58 +93,8 @@ func (b *Bot) getFileType(uploadType string) services.FileType {
 	}
 }
 
-func (b *Bot) sendErrorAndResetUpload(ctx context.Context, userID int64, errorMsg string) {
-	b.sendMessage(ctx, userID, fmt.Sprintf(errorMessage, errorMsg))
-
-	userRole, err := b.getUserRole(userID)
-	if err != nil {
-		b.logger.Errorf("Failed to get user role: %v", err)
-		return
-	}
-
-	b.sendKeyboardByRole(ctx, userID, userRole)
-	delete(b.pendingUploads, userID)
-}
-
-func (b *Bot) sendSuccessMessage(ctx context.Context, userID int64, uploadType string) {
-	message := b.getSuccessMessage(uploadType)
-	b.sendMessage(ctx, userID, message)
-	b.sendKeyboard(ctx, GetAdminKeyboard(b.MaxAPI), userID, nextActionMessage)
-}
-
-func (b *Bot) getSuccessMessage(uploadType string) string {
-	switch uploadType {
-	case "students":
-		return studentsSuccessMessage
-	case "teachers":
-		return teachersSuccessMessage
-	case "schedule":
-		return scheduleSuccessMessage
-	default:
-		return defaultSuccessMessage
-	}
-}
-
 func (b *Bot) getUserRole(userID int64) (string, error) {
 	return b.userRepo.GetUserRole(userID)
-}
-
-func (b *Bot) isMessageProcessed(messageID string) bool {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.processedMessages[messageID]
-}
-
-func (b *Bot) markMessageProcessed(messageID string) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.processedMessages[messageID] = true
-}
-
-func (b *Bot) cleanupProcessedMessage(messageID string) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	delete(b.processedMessages, messageID)
 }
 
 func (b *Bot) extractFileAttachments(attachments []interface{}) []*schemes.FileAttachment {
@@ -217,4 +119,67 @@ func (b *Bot) downloadAndProcessFile(ctx context.Context, fileAtt *schemes.FileA
 	}
 
 	return nil
+}
+
+func (b *Bot) getNearestDateForWeekday(targetWeekday int16) time.Time {
+	now := time.Now().Local()
+	now = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	var goWeekday time.Weekday
+	if targetWeekday == 7 {
+		goWeekday = time.Sunday // 0
+	} else {
+		goWeekday = time.Weekday(targetWeekday)
+	}
+
+	daysDiff := int(goWeekday - now.Weekday())
+	if daysDiff < 0 {
+		daysDiff += 7
+	}
+
+	monday := now.AddDate(0, 0, -int(now.Weekday())+1)
+	if now.Weekday() == time.Sunday {
+		monday = now.AddDate(0, 0, -6)
+	}
+
+	if targetWeekday == 7 {
+		return monday.AddDate(0, 0, 6)
+	}
+	return monday.AddDate(0, 0, int(targetWeekday-1))
+}
+
+func (b *Bot) getSubjectName(subjectID int64) string {
+	name, err := b.subjectRepo.GetSubjectName(subjectID)
+	if err != nil {
+		b.logger.Errorf("Failed to get subject name for ID %d: %v", subjectID, err)
+		return "Неизвестный предмет"
+	}
+	return name
+}
+
+func (b *Bot) getLessonTypeName(lessonTypeID int64) string {
+	name, err := b.lessonTypeRepo.GetLessonTypeName(lessonTypeID)
+	if err != nil {
+		b.logger.Errorf("Failed to get lesson type name for ID %d: %v", lessonTypeID, err)
+		return "Неизвестный тип"
+	}
+	return name
+}
+
+func (b *Bot) getTeacherName(teacherID int64) string {
+	name, err := b.userRepo.GetTeacherName(teacherID)
+	if err != nil {
+		b.logger.Errorf("Failed to get teacher name for ID %d: %v", teacherID, err)
+		return "Неизвестный преподаватель"
+	}
+	return name
+}
+
+func (b *Bot) getGroupName(groupID int64) string {
+	name, err := b.groupRepo.GetGroupName(groupID)
+	if err != nil {
+		b.logger.Errorf("Failed to get group name for ID %d: %v", groupID, err)
+		return "Неизвестная группа"
+	}
+	return name
 }

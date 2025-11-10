@@ -25,13 +25,14 @@ var weekdayNames = map[int16]string{
 
 func (b *Bot) formatSchedule(entries []database.Schedule, weekday int16) string {
 	dayName := b.getWeekdayName(weekday)
+	date := b.getNearestDateForWeekday(weekday).Format("02.01")
 
 	if len(entries) == 0 {
-		return fmt.Sprintf("📅 **%s**\n\nНет занятий.", dayName)
+		return fmt.Sprintf("🗓️%s **%s**\n\nНет занятий.", date, dayName)
 	}
 
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "📅 **%s**\n\n", dayName)
+	fmt.Fprintf(&sb, "🗓️%s **%s**\n\n", date, dayName)
 
 	for i, entry := range entries {
 		b.appendScheduleEntry(&sb, i+1, entry)
@@ -68,42 +69,6 @@ func (b *Bot) appendScheduleEntry(sb *strings.Builder, index int, entry database
 	)
 }
 
-func (b *Bot) getSubjectName(subjectID int64) string {
-	name, err := b.subjectRepo.GetSubjectName(subjectID)
-	if err != nil {
-		b.logger.Errorf("Failed to get subject name for ID %d: %v", subjectID, err)
-		return "Неизвестный предмет"
-	}
-	return name
-}
-
-func (b *Bot) getLessonTypeName(lessonTypeID int64) string {
-	name, err := b.lessonTypeRepo.GetLessonTypeName(lessonTypeID)
-	if err != nil {
-		b.logger.Errorf("Failed to get lesson type name for ID %d: %v", lessonTypeID, err)
-		return "Неизвестный тип"
-	}
-	return name
-}
-
-func (b *Bot) getTeacherName(teacherID int64) string {
-	name, err := b.userRepo.GetTeacherName(teacherID)
-	if err != nil {
-		b.logger.Errorf("Failed to get teacher name for ID %d: %v", teacherID, err)
-		return "Неизвестный преподаватель"
-	}
-	return name
-}
-
-func (b *Bot) getGroupName(groupID int64) string {
-	name, err := b.groupRepo.GetGroupName(groupID)
-	if err != nil {
-		b.logger.Errorf("Failed to get group name for ID %d: %v", groupID, err)
-		return "Неизвестная группа"
-	}
-	return name
-}
-
 func (b *Bot) sendScheduleForDay(ctx context.Context, maxUserID int64, weekday int16) error {
 	userRole, err := b.getUserRole(maxUserID)
 	if err != nil {
@@ -126,6 +91,7 @@ func (b *Bot) sendScheduleForDay(ctx context.Context, maxUserID int64, weekday i
 		}
 	} else {
 		entries, err = b.scheduleRepo.GetScheduleForDate(weekday)
+		b.logger.Infof("Sending schedule for weekday %d to user %d %v", weekday, maxUserID, entries)
 		if err != nil {
 			b.logger.Errorf("Failed to get schedule for weekday %d: %v", weekday, err)
 			return err
