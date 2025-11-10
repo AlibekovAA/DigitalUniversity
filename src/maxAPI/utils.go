@@ -2,13 +2,14 @@ package maxAPI
 
 import (
 	"context"
-	"digitalUniversity/services"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"digitalUniversity/services"
 
 	"github.com/max-messenger/max-bot-api-client-go/schemes"
 )
@@ -34,7 +35,7 @@ func (b *Bot) downloadFile(ctx context.Context, fileAtt *schemes.FileAttachment)
 	}
 
 	tmpDir := "./tmp"
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
 		return "", err
 	}
 

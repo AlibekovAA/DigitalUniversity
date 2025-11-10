@@ -11,7 +11,6 @@ import (
 	"digitalUniversity/application"
 	"digitalUniversity/config"
 	"digitalUniversity/logger"
-
 )
 
 func main() {

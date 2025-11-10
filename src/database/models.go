@@ -2,7 +2,6 @@ package database
 
 import (
 	"time"
-
 )
 
 type Role struct {

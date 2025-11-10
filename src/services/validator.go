@@ -24,8 +24,10 @@ const (
 var expectedHeaders = map[FileType][]string{
 	FileTypeStudents: {"User_id", "Last_name", "First_name", "Study_group"},
 	FileTypeTeachers: {"User_id", "Last_name", "First_name"},
-	FileTypeSchedule: {"subject_name", "type_name", "classroom", "group_name",
-		"teacher_last_name", "teacher_first_name", "weekday", "start_time", "end_time"},
+	FileTypeSchedule: {
+		"subject_name", "type_name", "classroom", "group_name",
+		"teacher_last_name", "teacher_first_name", "weekday", "start_time", "end_time",
+	},
 }
 
 type ValidationError struct {

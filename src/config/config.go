@@ -5,7 +5,6 @@ import (
 	"github.com/joho/godotenv"
 
 	"digitalUniversity/logger"
-
 )
 
 type Config struct {

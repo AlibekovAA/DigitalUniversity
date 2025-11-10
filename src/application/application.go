@@ -41,6 +41,5 @@ func (app *Application) Configure(cfg *config.Config, logger *logger.Logger, ctx
 }
 
 func (app *Application) Run(ctx context.Context) {
-
 	app.Bot.Start(ctx)
 }

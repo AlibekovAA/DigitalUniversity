@@ -64,7 +64,6 @@ func (r *UserRepository) CreateOrUpdateStudent(tx *sqlx.Tx, userMaxID int64, fir
 		SET usermax_id = $1, name = $2
 		WHERE first_name = $3 AND last_name = $4 AND role_id = $5 AND group_id = $6`,
 		userMaxID, fullName, firstName, lastName, roleID, groupID)
-
 	if err != nil {
 		return err
 	}
@@ -95,7 +94,6 @@ func (r *UserRepository) CreateOrUpdateTeacher(tx *sqlx.Tx, userMaxID int64, fir
 		SET usermax_id = $1, name = $2
 		WHERE first_name = $3 AND last_name = $4 AND role_id = $5 AND group_id IS NULL`,
 		userMaxID, fullName, firstName, lastName, roleID)
-
 	if err != nil {
 		return err
 	}
