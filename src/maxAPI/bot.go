@@ -21,6 +21,7 @@ type Bot struct {
 	pendingUploads    map[int64]string
 	processedMessages map[string]bool
 	uploadCounter     map[int64]int
+	lastMessageID     map[int64]string
 	mu                sync.Mutex
 
 	userRepo       *database.UserRepository
@@ -52,6 +53,7 @@ func NewBot(cfg *config.MaxConfig, log *logger.Logger, db *sqlx.DB, ctx context.
 		pendingUploads:    make(map[int64]string),
 		processedMessages: make(map[string]bool),
 		uploadCounter:     make(map[int64]int),
+		lastMessageID:     make(map[int64]string),
 
 		userRepo:       database.NewUserRepository(db),
 		groupRepo:      database.NewGroupRepository(db),

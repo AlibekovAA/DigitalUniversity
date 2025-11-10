@@ -123,10 +123,22 @@ func (b *Bot) handleCallback(ctx context.Context, u *schemes.MessageCallbackUpda
 	userID := sender.UserId
 	callbackID := u.Callback.CallbackID
 
-	b.logger.Debugf("Callback received: payload=%s, callbackID=%s, userID=%d",
-		u.Callback.Payload, callbackID, userID)
+	messageID := ""
+	if u.Message != nil {
+		messageID = u.Message.Body.Mid
+	}
+
+	if messageID == "" {
+		b.mu.Lock()
+		messageID = b.lastMessageID[userID]
+		b.mu.Unlock()
+	}
+
+	b.logger.Debugf("Callback received: payload=%s, callbackID=%s, userID=%d, messageID=%s",
+		u.Callback.Payload, callbackID, userID, messageID)
 
 	var message string
+
 	switch u.Callback.Payload {
 	case "uploadStudents":
 		message = sendStudentsFileMessage
@@ -142,13 +154,18 @@ func (b *Bot) handleCallback(ctx context.Context, u *schemes.MessageCallbackUpda
 		if currentWeekday == 0 {
 			currentWeekday = 7
 		}
-		if err := b.sendScheduleForDay(ctx, userID, currentWeekday); err != nil {
+		if err := b.sendScheduleForDay(ctx, userID, callbackID, currentWeekday); err != nil {
 			b.logger.Errorf("Failed to send schedule: %v", err)
 		}
 		return
 	case "markGrade":
-		if err := b.handleMarkGradeStart(ctx, userID); err != nil {
+		if err := b.handleMarkGradeStart(ctx, userID, callbackID); err != nil {
 			b.logger.Errorf("Failed to start grade marking: %v", err)
+		}
+		return
+	case "showScore":
+		if err := b.handleShowGradesStart(ctx, userID, callbackID); err != nil {
+			b.logger.Errorf("Failed to show grades: %v", err)
 		}
 		return
 	case "backToMenu":
@@ -172,6 +189,13 @@ func (b *Bot) handleCallback(ctx context.Context, u *schemes.MessageCallbackUpda
 		if strings.HasPrefix(u.Callback.Payload, "grade_") {
 			if err := b.handleGradeCallback(ctx, userID, callbackID, u.Callback.Payload); err != nil {
 				b.logger.Errorf("Failed to handle grade callback: %v", err)
+			}
+			return
+		}
+
+		if strings.HasPrefix(u.Callback.Payload, "show_grades_") {
+			if err := b.handleShowGradesCallback(ctx, userID, callbackID, u.Callback.Payload); err != nil {
+				b.logger.Errorf("Failed to handle show grades callback: %v", err)
 			}
 			return
 		}

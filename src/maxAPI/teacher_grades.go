@@ -22,7 +22,7 @@ const (
 	studentsPerPage = 5
 )
 
-func (b *Bot) handleMarkGradeStart(ctx context.Context, userID int64) error {
+func (b *Bot) handleMarkGradeStart(ctx context.Context, userID int64, callbackID string) error {
 	teacherID, err := b.userRepo.GetUserIDByMaxID(userID)
 	if err != nil {
 		b.logger.Errorf("Failed to get teacher ID: %v", err)
@@ -36,7 +36,7 @@ func (b *Bot) handleMarkGradeStart(ctx context.Context, userID int64) error {
 	}
 
 	if len(subjects) == 0 {
-		b.sendMessage(ctx, userID, "У вас нет предметов для выставления оценок.")
+		b.answerCallbackWithNotification(ctx, callbackID, "У вас нет предметов для выставления оценок.")
 		return nil
 	}
 
@@ -46,8 +46,14 @@ func (b *Bot) handleMarkGradeStart(ctx context.Context, userID int64) error {
 		keyboard.AddRow().AddCallback(subject.SubjectName, schemes.DEFAULT, payload)
 	}
 
-	b.sendKeyboard(ctx, keyboard, userID, selectSubjectMsg)
-	return nil
+	messageBody := &schemes.NewMessageBody{
+		Text:        selectSubjectMsg,
+		Attachments: []interface{}{schemes.NewInlineKeyboardAttachmentRequest(keyboard.Build())},
+	}
+
+	answer := &schemes.CallbackAnswer{Message: messageBody}
+	_, err = b.MaxAPI.Messages.AnswerOnCallback(ctx, callbackID, answer)
+	return err
 }
 
 func (b *Bot) handleGradeCallback(ctx context.Context, userID int64, callbackID, payload string) error {
@@ -272,8 +278,6 @@ func (b *Bot) handleGradeValueSelected(ctx context.Context, userID int64, callba
 	switch userRole {
 	case "teacher":
 		keyboard = GetTeacherKeyboard(b.MaxAPI)
-	case "admin":
-		keyboard = GetAdminKeyboard(b.MaxAPI)
 	default:
 		keyboard = GetTeacherKeyboard(b.MaxAPI)
 	}

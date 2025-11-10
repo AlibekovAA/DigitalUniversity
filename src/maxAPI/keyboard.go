@@ -80,7 +80,6 @@ func GetStudentsPaginationKeyboard(api *maxbot.Api, subjectID, groupID int64, cu
 			row.AddCallback(btnPrev, schemes.NEGATIVE, payload)
 		}
 
-		// Кнопка "Вперёд"
 		if currentPage < totalPages-1 {
 			nextPage := currentPage + 1
 			payload := fmt.Sprintf("grade_stud_page_%d_%d_%d_%d", subjectID, groupID, nextPage, totalPages)

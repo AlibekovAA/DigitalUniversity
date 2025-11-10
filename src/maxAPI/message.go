@@ -117,13 +117,20 @@ func (b *Bot) sendWelcomeWithKeyboard(ctx context.Context, userID int64, role st
 		return
 	}
 
-	_, err := b.MaxAPI.Messages.Send(ctx, maxbot.NewMessage().
+	messageID, err := b.MaxAPI.Messages.Send(ctx, maxbot.NewMessage().
 		SetUser(userID).
 		AddKeyboard(keyboard).
 		SetText(msg))
 	if err != nil && err.Error() != "" {
 		b.logger.Errorf("Failed to send welcome with keyboard: %v", err)
+		return
 	}
+
+	b.mu.Lock()
+	b.lastMessageID[userID] = messageID
+	b.mu.Unlock()
+
+	b.logger.Debugf("Saved message ID %s for user %d", messageID, userID)
 }
 
 func (b *Bot) sendKeyboardAfterError(ctx context.Context, userID int64) {

@@ -282,7 +282,6 @@ func (r *ScheduleRepository) GetScheduleForDateByGroup(weekday int16, groupID in
 	return entries, err
 }
 
-// GradeRepository для работы с оценками
 type GradeRepository struct {
 	db *sqlx.DB
 }

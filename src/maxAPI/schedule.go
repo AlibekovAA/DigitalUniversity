@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/max-messenger/max-bot-api-client-go/schemes"
+
 	"digitalUniversity/database"
 )
 
@@ -69,7 +71,7 @@ func (b *Bot) appendScheduleEntry(sb *strings.Builder, index int, entry database
 	)
 }
 
-func (b *Bot) sendScheduleForDay(ctx context.Context, maxUserID int64, weekday int16) error {
+func (b *Bot) sendScheduleForDay(ctx context.Context, maxUserID int64, callbackID string, weekday int16) error {
 	userRole, err := b.getUserRole(maxUserID)
 	if err != nil {
 		b.logger.Errorf("Failed to get user role: %v", err)
@@ -117,7 +119,19 @@ func (b *Bot) sendScheduleForDay(ctx context.Context, maxUserID int64, weekday i
 	b.logger.Infof("Sending schedule for weekday %d to user %d (role: %s)", weekday, maxUserID, userRole)
 
 	prevDay, nextDay := b.calculateNavigationDays(weekday)
-	b.sendKeyboard(ctx, GetScheduleKeyboard(b.MaxAPI, prevDay, nextDay), maxUserID, text)
+
+	messageBody := &schemes.NewMessageBody{
+		Text:        text,
+		Format:      "markdown",
+		Attachments: []interface{}{schemes.NewInlineKeyboardAttachmentRequest(GetScheduleKeyboard(b.MaxAPI, prevDay, nextDay).Build())},
+	}
+
+	answer := &schemes.CallbackAnswer{Message: messageBody}
+	_, err = b.MaxAPI.Messages.AnswerOnCallback(ctx, callbackID, answer)
+	if err != nil && err.Error() != "" {
+		b.logger.Errorf("Failed to answer callback with schedule: %v", err)
+		return err
+	}
 
 	return nil
 }

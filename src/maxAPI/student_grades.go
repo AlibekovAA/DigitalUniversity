@@ -1,0 +1,126 @@
+package maxAPI
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/max-messenger/max-bot-api-client-go/schemes"
+
+	"digitalUniversity/database"
+)
+
+const (
+	selectSubjectForGradesMsg = "Выберите предмет для просмотра оценок:"
+	noGradesMsg               = "По предмету **%s** оценок пока нет."
+	gradesListHeader          = "📊 Оценки по предмету **%s**:\n\n"
+	gradeEntryFormat          = "**%d** — %s\n"
+)
+
+func (b *Bot) handleShowGradesStart(ctx context.Context, userID int64, callbackID string) error {
+	studentID, err := b.userRepo.GetUserIDByMaxID(userID)
+	if err != nil {
+		b.logger.Errorf("Failed to get student ID: %v", err)
+		return err
+	}
+
+	groupID, err := b.userRepo.GetStudentGroupID(studentID)
+	if err != nil {
+		b.logger.Errorf("Failed to get student group ID: %v", err)
+		return err
+	}
+
+	subjects, err := b.gradeRepo.GetSubjectsByStudentGroup(groupID)
+	if err != nil {
+		b.logger.Errorf("Failed to get subjects for group %d: %v", groupID, err)
+		return err
+	}
+
+	if len(subjects) == 0 {
+		b.answerCallbackWithNotification(ctx, callbackID, "У вашей группы пока нет предметов.")
+		return nil
+	}
+
+	keyboard := b.MaxAPI.Messages.NewKeyboardBuilder()
+	for _, subject := range subjects {
+		payload := fmt.Sprintf("show_grades_subj_%d", subject.SubjectID)
+		keyboard.AddRow().AddCallback(subject.SubjectName, schemes.DEFAULT, payload)
+	}
+
+	messageBody := &schemes.NewMessageBody{
+		Text:        selectSubjectForGradesMsg,
+		Attachments: []interface{}{schemes.NewInlineKeyboardAttachmentRequest(keyboard.Build())},
+	}
+
+	answer := &schemes.CallbackAnswer{Message: messageBody}
+	_, err = b.MaxAPI.Messages.AnswerOnCallback(ctx, callbackID, answer)
+	return err
+}
+
+func (b *Bot) handleShowGradesCallback(ctx context.Context, userID int64, callbackID, payload string) error {
+	parts := strings.Split(payload, "_")
+
+	if len(parts) < 4 {
+		return fmt.Errorf("invalid show_grades callback payload: %s", payload)
+	}
+
+	if parts[2] == "subj" {
+		return b.handleSubjectSelectedForGrades(ctx, userID, callbackID, payload)
+	}
+
+	return fmt.Errorf("unknown show_grades callback type: %s", payload)
+}
+
+func (b *Bot) handleSubjectSelectedForGrades(ctx context.Context, userID int64, callbackID, payload string) error {
+	var subjectID int64
+	fmt.Sscanf(payload, "show_grades_subj_%d", &subjectID)
+
+	studentID, err := b.userRepo.GetUserIDByMaxID(userID)
+	if err != nil {
+		b.logger.Errorf("Failed to get student ID: %v", err)
+		return err
+	}
+
+	subjectName, err := b.subjectRepo.GetSubjectName(subjectID)
+	if err != nil {
+		b.logger.Errorf("Failed to get subject name: %v", err)
+		subjectName = "Предмет"
+	}
+
+	grades, err := b.gradeRepo.GetGradesByStudentAndSubject(studentID, subjectID)
+	if err != nil {
+		b.logger.Errorf("Failed to get grades: %v", err)
+		return err
+	}
+
+	var text string
+	if len(grades) == 0 {
+		text = fmt.Sprintf(noGradesMsg, subjectName)
+	} else {
+		text = b.formatGradesList(grades, subjectName)
+	}
+
+	keyboard := GetStudentKeyboard(b.MaxAPI)
+
+	messageBody := &schemes.NewMessageBody{
+		Text:        text,
+		Format:      "markdown",
+		Attachments: []interface{}{schemes.NewInlineKeyboardAttachmentRequest(keyboard.Build())},
+	}
+
+	answer := &schemes.CallbackAnswer{Message: messageBody}
+	_, err = b.MaxAPI.Messages.AnswerOnCallback(ctx, callbackID, answer)
+	return err
+}
+
+func (b *Bot) formatGradesList(grades []database.Grade, subjectName string) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, gradesListHeader, subjectName)
+
+	for _, grade := range grades {
+		dateStr := grade.GradeDate.Format("02.01.2006 15:04")
+		fmt.Fprintf(&sb, gradeEntryFormat, grade.GradeValue, dateStr)
+	}
+
+	return sb.String()
+}
