@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	maxbot "github.com/max-messenger/max-bot-api-client-go"
 	"github.com/max-messenger/max-bot-api-client-go/schemes"
 )
 
@@ -13,6 +14,10 @@ const (
 	welcomeTeacherMsg = "Добро пожаловать, преподаватель! 👨‍🏫"
 	welcomeStudentMsg = "Добро пожаловать, студент! 🎓"
 	welcomeAdminMsg   = "Добро пожаловать, администратор! 👨‍💼"
+
+	mainMenuAdminMsg   = "Главное меню администратора:"
+	mainMenuTeacherMsg = "Главное меню преподавателя:"
+	mainMenuStudentMsg = "Главное меню студента:"
 
 	unknownMessage        = "❓ Я не понимаю это сообщение."
 	unknownMessageDefault = "❓ Я не понимаю это сообщение.\n\nОбратитесь к администратору для получения доступа."
@@ -141,6 +146,16 @@ func (b *Bot) handleCallback(ctx context.Context, u *schemes.MessageCallbackUpda
 			b.logger.Errorf("Failed to send schedule: %v", err)
 		}
 		return
+	case "markGrade":
+		if err := b.handleMarkGradeStart(ctx, userID); err != nil {
+			b.logger.Errorf("Failed to start grade marking: %v", err)
+		}
+		return
+	case "backToMenu":
+		if err := b.handleBackToMenu(ctx, userID, callbackID); err != nil {
+			b.logger.Errorf("Failed to return to menu: %v", err)
+		}
+		return
 	default:
 		if strings.HasPrefix(u.Callback.Payload, "sch_day_") {
 			var day int16
@@ -153,6 +168,14 @@ func (b *Bot) handleCallback(ctx context.Context, u *schemes.MessageCallbackUpda
 			}
 			return
 		}
+
+		if strings.HasPrefix(u.Callback.Payload, "grade_") {
+			if err := b.handleGradeCallback(ctx, userID, callbackID, u.Callback.Payload); err != nil {
+				b.logger.Errorf("Failed to handle grade callback: %v", err)
+			}
+			return
+		}
+
 		b.logger.Warnf("Unknown callback: %s", u.Callback.Payload)
 		return
 	}
@@ -160,6 +183,47 @@ func (b *Bot) handleCallback(ctx context.Context, u *schemes.MessageCallbackUpda
 	if err := b.sendMessage(ctx, sender.UserId, message); err != nil {
 		b.logger.Errorf("Failed to send callback response: %v", err)
 	}
+}
+
+func (b *Bot) handleBackToMenu(ctx context.Context, userID int64, callbackID string) error {
+	userRole, err := b.getUserRole(userID)
+	if err != nil {
+		b.logger.Errorf("Failed to get user role: %v", err)
+		return err
+	}
+
+	var keyboard *maxbot.Keyboard
+	var menuText string
+
+	switch userRole {
+	case "admin":
+		keyboard = GetAdminKeyboard(b.MaxAPI)
+		menuText = mainMenuAdminMsg
+	case "teacher":
+		keyboard = GetTeacherKeyboard(b.MaxAPI)
+		menuText = mainMenuTeacherMsg
+	case "student":
+		keyboard = GetStudentKeyboard(b.MaxAPI)
+		menuText = mainMenuStudentMsg
+	default:
+		b.logger.Warnf("Unknown role: %s", userRole)
+		return fmt.Errorf("unknown role: %s", userRole)
+	}
+
+	messageBody := &schemes.NewMessageBody{
+		Text:        menuText,
+		Attachments: []interface{}{schemes.NewInlineKeyboardAttachmentRequest(keyboard.Build())},
+	}
+
+	answer := &schemes.CallbackAnswer{Message: messageBody}
+	_, err = b.MaxAPI.Messages.AnswerOnCallback(ctx, callbackID, answer)
+	if err != nil && err.Error() != "" {
+		b.logger.Errorf("Failed to answer callback: %v", err)
+		return err
+	}
+
+	b.logger.Infof("User %d returned to main menu (role: %s)", userID, userRole)
+	return nil
 }
 
 func (b *Bot) handleUnexpectedMessage(ctx context.Context, userID int64) {

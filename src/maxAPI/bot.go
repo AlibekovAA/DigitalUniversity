@@ -13,10 +13,6 @@ import (
 	"digitalUniversity/logger"
 )
 
-const (
-	welcomeMsg = "Привет! 👋 Я бот цифрового университета."
-)
-
 type Bot struct {
 	MaxBot            *schemes.BotInfo
 	db                *sqlx.DB
@@ -32,6 +28,7 @@ type Bot struct {
 	subjectRepo    *database.SubjectRepository
 	lessonTypeRepo *database.LessonTypeRepository
 	scheduleRepo   *database.ScheduleRepository
+	gradeRepo      *database.GradeRepository
 }
 
 func NewBot(cfg *config.MaxConfig, log *logger.Logger, db *sqlx.DB, ctx context.Context) (*Bot, error) {
@@ -61,6 +58,7 @@ func NewBot(cfg *config.MaxConfig, log *logger.Logger, db *sqlx.DB, ctx context.
 		subjectRepo:    database.NewSubjectRepository(db),
 		lessonTypeRepo: database.NewLessonTypeRepository(db),
 		scheduleRepo:   database.NewScheduleRepository(db),
+		gradeRepo:      database.NewGradeRepository(db),
 	}, nil
 }
 

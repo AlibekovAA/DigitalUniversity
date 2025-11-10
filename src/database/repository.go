@@ -281,3 +281,86 @@ func (r *ScheduleRepository) GetScheduleForDateByGroup(weekday int16, groupID in
 	err := r.db.Select(&entries, query, weekday, groupID)
 	return entries, err
 }
+
+// GradeRepository для работы с оценками
+type GradeRepository struct {
+	db *sqlx.DB
+}
+
+func NewGradeRepository(db *sqlx.DB) *GradeRepository {
+	return &GradeRepository{db: db}
+}
+
+func (r *GradeRepository) GetSubjectsByTeacher(teacherID int64) ([]Subject, error) {
+	var subjects []Subject
+	query := `SELECT * FROM subjects WHERE teacher_id = $1 ORDER BY subject_name`
+	err := r.db.Select(&subjects, query, teacherID)
+	return subjects, err
+}
+
+func (r *GradeRepository) GetSubjectsByStudentGroup(groupID int64) ([]Subject, error) {
+	var subjects []Subject
+	query := `
+        SELECT DISTINCT s.subject_id, s.subject_name, s.teacher_id
+        FROM subjects s
+        JOIN groups_subjects gs ON s.subject_id = gs.subject_id
+        WHERE gs.group_id = $1
+        ORDER BY s.subject_name`
+	err := r.db.Select(&subjects, query, groupID)
+	return subjects, err
+}
+
+func (r *GradeRepository) GetGradesByStudentAndSubject(studentID, subjectID int64) ([]Grade, error) {
+	var grades []Grade
+	query := `SELECT * FROM grades WHERE student_id = $1 AND subject_id = $2 ORDER BY grade_date DESC`
+	err := r.db.Select(&grades, query, studentID, subjectID)
+	return grades, err
+}
+
+func (r *GradeRepository) GetGroupsBySubjectAndTeacher(subjectID, teacherID int64) ([]Group, error) {
+	var groups []Group
+	query := `
+        SELECT DISTINCT g.group_id, g.group_name
+        FROM groups g
+        JOIN groups_subjects gs ON g.group_id = gs.group_id
+        JOIN subjects s ON gs.subject_id = s.subject_id
+        WHERE s.subject_id = $1 AND s.teacher_id = $2
+        ORDER BY g.group_name`
+	err := r.db.Select(&groups, query, subjectID, teacherID)
+	return groups, err
+}
+
+func (r *GradeRepository) GetStudentsByGroup(groupID int64) ([]User, error) {
+	var students []User
+	query := `
+        SELECT * FROM users
+        WHERE group_id = $1 AND role_id = (SELECT role_id FROM roles WHERE role_name = 'student')
+        ORDER BY last_name, first_name`
+	err := r.db.Select(&students, query, groupID)
+	return students, err
+}
+
+func (r *GradeRepository) GetScheduleBySubjectAndGroup(subjectID, groupID int64) ([]Schedule, error) {
+	var schedules []Schedule
+	query := `
+        SELECT * FROM schedule
+        WHERE subject_id = $1 AND group_id = $2
+        ORDER BY weekday, start_time`
+	err := r.db.Select(&schedules, query, subjectID, groupID)
+	return schedules, err
+}
+
+func (r *GradeRepository) CreateGrade(studentID, teacherID, subjectID, scheduleID int64, gradeValue int) error {
+	_, err := r.db.Exec(`
+        INSERT INTO grades (student_id, teacher_id, subject_id, schedule_id, grade_value, grade_date)
+        VALUES ($1, $2, $3, $4, $5, NOW())`,
+		studentID, teacherID, subjectID, scheduleID, gradeValue)
+	return err
+}
+
+func (r *GradeRepository) GetGradesByStudent(studentID int64) ([]Grade, error) {
+	var grades []Grade
+	query := `SELECT * FROM grades WHERE student_id = $1 ORDER BY grade_date DESC`
+	err := r.db.Select(&grades, query, studentID)
+	return grades, err
+}
