@@ -177,6 +177,15 @@ func (r *UserRepository) GetUserIDByMaxID(userMaxID int64) (int64, error) {
 	return userID, err
 }
 
+func (r *UserRepository) GetStudentGroupID(userID int64) (int64, error) {
+	var groupID int64
+	err := r.db.Get(&groupID, `
+        SELECT group_id
+        FROM users
+        WHERE user_id = $1 AND group_id IS NOT NULL`, userID)
+	return groupID, err
+}
+
 type SubjectRepository struct {
 	db *sqlx.DB
 }
@@ -263,5 +272,12 @@ func (r *ScheduleRepository) GetScheduleForDateByTeacher(weekday int16, teacherI
 	var entries []Schedule
 	query := `SELECT * FROM schedule WHERE weekday = $1 AND teacher_id = $2 ORDER BY start_time`
 	err := r.db.Select(&entries, query, weekday, teacherID)
+	return entries, err
+}
+
+func (r *ScheduleRepository) GetScheduleForDateByGroup(weekday int16, groupID int64) ([]Schedule, error) {
+	var entries []Schedule
+	query := `SELECT * FROM schedule WHERE weekday = $1 AND group_id = $2 ORDER BY start_time`
+	err := r.db.Select(&entries, query, weekday, groupID)
 	return entries, err
 }

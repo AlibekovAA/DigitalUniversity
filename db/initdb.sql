@@ -110,7 +110,7 @@ VALUES (
         (
             SELECT role_id
             FROM roles
-            WHERE role_name = 'admin'
+            WHERE role_name = 'teacher'
         ),
         NULL
     ),

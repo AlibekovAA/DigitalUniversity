@@ -10,8 +10,14 @@ import (
 )
 
 const (
-	teachersMessage         = "Добро пожаловать, преподаватель! 👨‍🏫"
-	studentsMessage         = "Добро пожаловать, студент! 🎓"
+	welcomeTeacherMsg = "Добро пожаловать, преподаватель! 👨‍🏫"
+	welcomeStudentMsg = "Добро пожаловать, студент! 🎓"
+	welcomeAdminMsg   = "Добро пожаловать, администратор! 👨‍💼"
+
+	unknownMessage        = "❓ Я не понимаю это сообщение."
+	unknownMessageDefault = "❓ Я не понимаю это сообщение.\n\nОбратитесь к администратору для получения доступа."
+	retryActionMessage    = "Попробуйте снова или выберите другое действие:"
+
 	fileNotFoundMessage     = "Файл не найден. Отправьте CSV файл."
 	multipleFilesMessage    = "Отправлено %d файла(ов). Пожалуйста, отправьте только один CSV файл за раз."
 	sendStudentsFileMessage = "Отправьте файл со списком студентов (с расширением .csv)."
@@ -22,20 +28,11 @@ const (
 	teachersSuccessMessage  = "✅ Преподаватели успешно загружены!"
 	scheduleSuccessMessage  = "✅ Расписание успешно загружено!"
 	defaultSuccessMessage   = "✅ Данные успешно загружены!"
-	unknownMessageText      = "❓ Я не понимаю это сообщение.\n\nИспользуйте кнопки для взаимодействия с ботом."
-	unknownMessageAdmin     = "❓ Я не понимаю это сообщение.\n\nИспользуйте кнопки меню для управления:"
-	unknownMessageDefault   = "❓ Я не понимаю это сообщение.\n\nИспользуйте команду /start для начала работы с ботом."
-	unknownMessageWithStart = "%s\n\nПожалуйста, используйте команду /start для начала работы."
 	nextActionMessage       = "Выберите следующее действие:"
 )
 
 func (b *Bot) handleBotStarted(ctx context.Context, u *schemes.BotStartedUpdate) {
 	sender := u.User
-
-	if err := b.sendMessage(ctx, sender.UserId, welcomeMsg); err != nil {
-		b.logger.Errorf("Failed to send start message: %v", err)
-		return
-	}
 
 	userRole, err := b.getUserRole(sender.UserId)
 	if err != nil {
@@ -43,7 +40,7 @@ func (b *Bot) handleBotStarted(ctx context.Context, u *schemes.BotStartedUpdate)
 		return
 	}
 
-	b.sendKeyboardByRole(ctx, sender.UserId, userRole)
+	b.sendWelcomeWithKeyboard(ctx, sender.UserId, userRole)
 }
 
 func (b *Bot) handleMessageCreated(ctx context.Context, u *schemes.MessageCreatedUpdate) {
@@ -91,7 +88,7 @@ func (b *Bot) handleMessageCreated(ctx context.Context, u *schemes.MessageCreate
 
 	if count == 1 {
 		go func() {
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 
 			b.mu.Lock()
 			totalFiles := b.uploadCounter[userID]
@@ -107,8 +104,7 @@ func (b *Bot) handleMessageCreated(ctx context.Context, u *schemes.MessageCreate
 			if err := b.downloadAndProcessFile(ctx, fileAttachments[0], uploadType); err != nil {
 				b.logger.Errorf("Failed to process file %s: %v", fileAttachments[0].Filename, err)
 				b.sendMessage(ctx, userID, fmt.Sprintf(errorMessage, err.Error()))
-				userRole, _ := b.getUserRole(userID)
-				b.sendKeyboardByRole(ctx, userID, userRole)
+				b.sendKeyboardAfterError(ctx, userID)
 				return
 			}
 
@@ -120,6 +116,10 @@ func (b *Bot) handleMessageCreated(ctx context.Context, u *schemes.MessageCreate
 func (b *Bot) handleCallback(ctx context.Context, u *schemes.MessageCallbackUpdate) {
 	sender := u.Callback.User
 	userID := sender.UserId
+	callbackID := u.Callback.CallbackID
+
+	b.logger.Debugf("Callback received: payload=%s, callbackID=%s, userID=%d",
+		u.Callback.Payload, callbackID, userID)
 
 	var message string
 	switch u.Callback.Payload {
@@ -145,8 +145,11 @@ func (b *Bot) handleCallback(ctx context.Context, u *schemes.MessageCallbackUpda
 		if strings.HasPrefix(u.Callback.Payload, "sch_day_") {
 			var day int16
 			fmt.Sscanf(u.Callback.Payload, "sch_day_%d", &day)
-			if err := b.sendScheduleForDay(ctx, userID, day); err != nil {
-				b.logger.Errorf("Failed to send schedule: %v", err)
+
+			b.logger.Debugf("Processing schedule navigation: day=%d, callbackID=%s", day, callbackID)
+
+			if err := b.answerScheduleCallback(ctx, userID, callbackID, day); err != nil {
+				b.logger.Errorf("Failed to answer callback: %v", err)
 			}
 			return
 		}
@@ -163,16 +166,17 @@ func (b *Bot) handleUnexpectedMessage(ctx context.Context, userID int64) {
 	userRole, err := b.getUserRole(userID)
 	if err != nil {
 		b.logger.Errorf("Failed to get role from db: %v", err)
-		b.sendMessage(ctx, userID, unknownMessageText)
+		b.sendMessage(ctx, userID, unknownMessageDefault)
 		return
 	}
 
 	switch userRole {
 	case "admin":
-		b.sendMessage(ctx, userID, unknownMessageAdmin)
-		b.sendKeyboard(ctx, GetAdminKeyboard(b.MaxAPI), userID, adminMsg)
-	case "teacher", "student":
-		b.sendMessage(ctx, userID, fmt.Sprintf(unknownMessageWithStart, unknownMessageText))
+		b.sendKeyboard(ctx, GetAdminKeyboard(b.MaxAPI), userID, unknownMessage)
+	case "teacher":
+		b.sendKeyboard(ctx, GetTeacherKeyboard(b.MaxAPI), userID, unknownMessage)
+	case "student":
+		b.sendKeyboard(ctx, GetStudentKeyboard(b.MaxAPI), userID, unknownMessage)
 	default:
 		b.sendMessage(ctx, userID, unknownMessageDefault)
 	}

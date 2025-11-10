@@ -78,7 +78,8 @@ func (b *Bot) sendScheduleForDay(ctx context.Context, maxUserID int64, weekday i
 
 	var entries []database.Schedule
 
-	if userRole == "teacher" {
+	switch userRole {
+	case "teacher":
 		teacherID, err := b.userRepo.GetUserIDByMaxID(maxUserID)
 		if err != nil {
 			b.logger.Errorf("Failed to get teacher ID: %v", err)
@@ -89,17 +90,31 @@ func (b *Bot) sendScheduleForDay(ctx context.Context, maxUserID int64, weekday i
 			b.logger.Errorf("Failed to get schedule for teacher %d, weekday %d: %v", teacherID, weekday, err)
 			return err
 		}
-	} else {
-		entries, err = b.scheduleRepo.GetScheduleForDate(weekday)
-		b.logger.Infof("Sending schedule for weekday %d to user %d %v", weekday, maxUserID, entries)
+	case "student":
+		studentID, err := b.userRepo.GetUserIDByMaxID(maxUserID)
 		if err != nil {
-			b.logger.Errorf("Failed to get schedule for weekday %d: %v", weekday, err)
+			b.logger.Errorf("Failed to get student ID: %v", err)
 			return err
 		}
+
+		groupID, err := b.userRepo.GetStudentGroupID(studentID)
+		if err != nil {
+			b.logger.Errorf("Failed to get group ID for student %d: %v", studentID, err)
+			return err
+		}
+
+		entries, err = b.scheduleRepo.GetScheduleForDateByGroup(weekday, groupID)
+		if err != nil {
+			b.logger.Errorf("Failed to get schedule for group %d, weekday %d: %v", groupID, weekday, err)
+			return err
+		}
+	default:
+		b.logger.Warnf("User %d with role %s tried to access schedule", maxUserID, userRole)
+		return fmt.Errorf("schedule not available for role: %s", userRole)
 	}
 
 	text := b.formatSchedule(entries, weekday)
-	b.logger.Infof("Sending schedule for weekday %d to user %d", weekday, maxUserID)
+	b.logger.Infof("Sending schedule for weekday %d to user %d (role: %s)", weekday, maxUserID, userRole)
 
 	prevDay, nextDay := b.calculateNavigationDays(weekday)
 	b.sendKeyboard(ctx, GetScheduleKeyboard(b.MaxAPI, prevDay, nextDay), maxUserID, text)
@@ -119,4 +134,61 @@ func (b *Bot) calculateNavigationDays(weekday int16) (prev, next int16) {
 	}
 
 	return prev, next
+}
+
+func (b *Bot) answerScheduleCallback(ctx context.Context, maxUserID int64, callbackID string, weekday int16) error {
+	userRole, err := b.getUserRole(maxUserID)
+	if err != nil {
+		b.logger.Errorf("Failed to get user role: %v", err)
+		return err
+	}
+
+	var entries []database.Schedule
+
+	switch userRole {
+	case "teacher":
+		teacherID, err := b.userRepo.GetUserIDByMaxID(maxUserID)
+		if err != nil {
+			b.logger.Errorf("Failed to get teacher ID: %v", err)
+			return err
+		}
+		entries, err = b.scheduleRepo.GetScheduleForDateByTeacher(weekday, teacherID)
+		if err != nil {
+			b.logger.Errorf("Failed to get schedule for teacher %d, weekday %d: %v", teacherID, weekday, err)
+			return err
+		}
+	case "student":
+		studentID, err := b.userRepo.GetUserIDByMaxID(maxUserID)
+		if err != nil {
+			b.logger.Errorf("Failed to get student ID: %v", err)
+			return err
+		}
+
+		groupID, err := b.userRepo.GetStudentGroupID(studentID)
+		if err != nil {
+			b.logger.Errorf("Failed to get group ID for student %d: %v", studentID, err)
+			return err
+		}
+
+		entries, err = b.scheduleRepo.GetScheduleForDateByGroup(weekday, groupID)
+		if err != nil {
+			b.logger.Errorf("Failed to get schedule for group %d, weekday %d: %v", groupID, weekday, err)
+			return err
+		}
+	default:
+		b.logger.Warnf("User %d with role %s tried to access schedule", maxUserID, userRole)
+		return fmt.Errorf("schedule not available for role: %s", userRole)
+	}
+
+	text := b.formatSchedule(entries, weekday)
+	b.logger.Infof("Answering callback for weekday %d, user %d (role: %s)", weekday, maxUserID, userRole)
+
+	prevDay, nextDay := b.calculateNavigationDays(weekday)
+
+	if err := b.answerCallbackWithKeyboard(ctx, callbackID, GetScheduleKeyboard(b.MaxAPI, prevDay, nextDay), text); err != nil {
+		b.logger.Errorf("Failed to answer callback: %v", err)
+		return err
+	}
+
+	return nil
 }

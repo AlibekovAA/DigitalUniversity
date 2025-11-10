@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"digitalUniversity/services"
-
 	"github.com/max-messenger/max-bot-api-client-go/schemes"
+
+	"digitalUniversity/services"
 )
 
 func (b *Bot) downloadFile(ctx context.Context, fileAtt *schemes.FileAttachment) (string, error) {
@@ -128,7 +128,7 @@ func (b *Bot) getNearestDateForWeekday(targetWeekday int16) time.Time {
 
 	var goWeekday time.Weekday
 	if targetWeekday == 7 {
-		goWeekday = time.Sunday // 0
+		goWeekday = time.Sunday
 	} else {
 		goWeekday = time.Weekday(targetWeekday)
 	}

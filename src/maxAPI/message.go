@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	maxbot "github.com/max-messenger/max-bot-api-client-go"
+	"github.com/max-messenger/max-bot-api-client-go/schemes"
 )
 
 func (b *Bot) isMessageProcessed(messageID string) bool {
@@ -27,14 +28,7 @@ func (b *Bot) cleanupProcessedMessage(messageID string) {
 
 func (b *Bot) sendErrorAndResetUpload(ctx context.Context, userID int64, errorMsg string) {
 	b.sendMessage(ctx, userID, fmt.Sprintf(errorMessage, errorMsg))
-
-	userRole, err := b.getUserRole(userID)
-	if err != nil {
-		b.logger.Errorf("Failed to get user role: %v", err)
-		return
-	}
-
-	b.sendKeyboardByRole(ctx, userID, userRole)
+	b.sendKeyboardAfterError(ctx, userID)
 	delete(b.pendingUploads, userID)
 }
 
@@ -57,34 +51,6 @@ func (b *Bot) getSuccessMessage(uploadType string) string {
 	}
 }
 
-func (b *Bot) sendKeyboardByRole(ctx context.Context, userID int64, role string) {
-	var keyboard *maxbot.Keyboard
-	var msg string
-
-	switch role {
-	case "admin":
-		keyboard = GetAdminKeyboard(b.MaxAPI)
-		msg = adminMsg
-	case "teacher":
-		keyboard = GetTeacherKeyboard(b.MaxAPI)
-		msg = teachersMessage
-	case "student":
-		keyboard = GetStudentKeyboard(b.MaxAPI)
-		msg = studentsMessage
-	default:
-		b.logger.Warnf("Unknown role: %q", role)
-		return
-	}
-
-	_, err := b.MaxAPI.Messages.Send(ctx, maxbot.NewMessage().
-		SetUser(userID).
-		AddKeyboard(keyboard).
-		SetText(msg))
-	if err != nil && err.Error() != "" {
-		b.logger.Errorf("Failed to send keyboard: %v", err)
-	}
-}
-
 func (b *Bot) sendKeyboard(ctx context.Context, keyboard *maxbot.Keyboard, userID int64, msg string) {
 	_, err := b.MaxAPI.Messages.Send(ctx, maxbot.NewMessage().
 		SetUser(userID).
@@ -103,4 +69,82 @@ func (b *Bot) sendMessage(ctx context.Context, userID int64, text string) error 
 		return err
 	}
 	return nil
+}
+
+func (b *Bot) answerCallbackWithKeyboard(ctx context.Context, callbackID string, keyboard *maxbot.Keyboard, text string) error {
+	b.logger.Debugf("Answering callback ID: %s with text length: %d", callbackID, len(text))
+
+	messageBody := &schemes.NewMessageBody{
+		Text:        text,
+		Format:      "markdown",
+		Attachments: []interface{}{},
+	}
+
+	keyboardBuilt := keyboard.Build()
+	messageBody.Attachments = append(messageBody.Attachments, schemes.NewInlineKeyboardAttachmentRequest(keyboardBuilt))
+
+	answer := &schemes.CallbackAnswer{
+		Message: messageBody,
+	}
+
+	_, err := b.MaxAPI.Messages.AnswerOnCallback(ctx, callbackID, answer)
+	if err != nil && err.Error() != "" {
+		b.logger.Errorf("AnswerOnCallback failed: %v", err)
+		return err
+	}
+
+	b.logger.Infof("Successfully answered callback: %s", callbackID)
+	return nil
+}
+
+func (b *Bot) sendWelcomeWithKeyboard(ctx context.Context, userID int64, role string) {
+	var keyboard *maxbot.Keyboard
+	var msg string
+
+	switch role {
+	case "admin":
+		keyboard = GetAdminKeyboard(b.MaxAPI)
+		msg = welcomeAdminMsg
+	case "teacher":
+		keyboard = GetTeacherKeyboard(b.MaxAPI)
+		msg = welcomeTeacherMsg
+	case "student":
+		keyboard = GetStudentKeyboard(b.MaxAPI)
+		msg = welcomeStudentMsg
+	default:
+		b.logger.Warnf("Unknown role: %q", role)
+		b.sendMessage(ctx, userID, "Добро пожаловать! 👋")
+		return
+	}
+
+	_, err := b.MaxAPI.Messages.Send(ctx, maxbot.NewMessage().
+		SetUser(userID).
+		AddKeyboard(keyboard).
+		SetText(msg))
+	if err != nil && err.Error() != "" {
+		b.logger.Errorf("Failed to send welcome with keyboard: %v", err)
+	}
+}
+
+func (b *Bot) sendKeyboardAfterError(ctx context.Context, userID int64) {
+	userRole, err := b.getUserRole(userID)
+	if err != nil {
+		b.logger.Errorf("Failed to get user role: %v", err)
+		return
+	}
+
+	var keyboard *maxbot.Keyboard
+	switch userRole {
+	case "admin":
+		keyboard = GetAdminKeyboard(b.MaxAPI)
+	case "teacher":
+		keyboard = GetTeacherKeyboard(b.MaxAPI)
+	case "student":
+		keyboard = GetStudentKeyboard(b.MaxAPI)
+	default:
+		b.logger.Warnf("Unknown role for user %d: %q", userID, userRole)
+		return
+	}
+
+	b.sendKeyboard(ctx, keyboard, userID, retryActionMessage)
 }
