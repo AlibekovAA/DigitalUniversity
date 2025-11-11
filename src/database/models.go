@@ -69,10 +69,3 @@ type Attendance struct {
 	Attended     bool      `db:"attended" json:"attended"`
 	MarkTime     time.Time `db:"mark_time" json:"mark_time"`
 }
-
-type Material struct {
-	MaterialID int64     `db:"material_id" json:"material_id"`
-	SubjectID  int64     `db:"subject_id" json:"subject_id"`
-	FileURL    string    `db:"file_url" json:"file_url"`
-	UploadedAt time.Time `db:"uploaded_at" json:"uploaded_at"`
-}

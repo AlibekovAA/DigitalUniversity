@@ -60,12 +60,7 @@ CREATE TABLE IF NOT EXISTS attendance (
     attended BOOLEAN NOT NULL,
     mark_time TIMESTAMP DEFAULT NOW()
 );
-CREATE TABLE IF NOT EXISTS materials (
-    material_id SERIAL PRIMARY KEY,
-    subject_id INT NOT NULL REFERENCES subjects(subject_id),
-    file_url TEXT NOT NULL,
-    uploaded_at TIMESTAMP DEFAULT NOW()
-);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_teacher_unique ON users(first_name, last_name, role_id)
 WHERE group_id IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_student_unique ON users(first_name, last_name, role_id, group_id)
@@ -89,7 +84,6 @@ CREATE INDEX IF NOT EXISTS idx_attendance_schedule_id ON attendance(schedule_id)
 CREATE INDEX IF NOT EXISTS idx_attendance_student_schedule ON attendance(student_id, schedule_id);
 CREATE INDEX IF NOT EXISTS idx_subjects_teacher_id ON subjects(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_subjects_name ON subjects(subject_name);
-CREATE INDEX IF NOT EXISTS idx_materials_subject_id ON materials(subject_id);
 INSERT INTO roles (role_name)
 VALUES ('admin'),
     ('teacher'),
