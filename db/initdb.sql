@@ -110,18 +110,6 @@ VALUES (
         (
             SELECT role_id
             FROM roles
-            WHERE role_name = 'teacher'
-        ),
-        NULL
-    ),
-    (
-        'Aslan Alibekov',
-        83593004,
-        'Aslan',
-        'Alibekov',
-        (
-            SELECT role_id
-            FROM roles
             WHERE role_name = 'admin'
         ),
         NULL
