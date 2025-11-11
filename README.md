@@ -93,13 +93,7 @@ docker system prune -a --volumes -f
 ## Структура базы данных
 ![ER-диаграмма](screenshots/db.jpg) 
 
-### Ключевые сущности:
-| Таблица | Описание | Связи |
-|---------|----------|-------|
-| `users` | Пользователи системы | role_id → roles, group_id → groups |
-| `schedule` | Расписание занятий | subject_id → subjects, group_id → groups |
-| `grades` | Успеваемость | student_id → users, subject_id → subjects |
-| `attendance` | Посещаемость | student_id → users, schedule_id → schedule |
+
 
 ##### Структура базы данных
 ###### Таблица пользователей (users)
@@ -210,16 +204,7 @@ CREATE TABLE IF NOT EXISTS attendance (
 );
 ```
 
-###### Таблица материалов (materials)
 
-```sql
-CREATE TABLE IF NOT EXISTS materials (
-    material_id SERIAL PRIMARY KEY,
-    subject_id INT NOT NULL REFERENCES subjects(subject_id),
-    file_url TEXT NOT NULL,
-    uploaded_at TIMESTAMP DEFAULT NOW()
-);
-```
 
 Полная схема: [`db/initdb.sql`](db/initdb.sql)
 
@@ -256,11 +241,16 @@ src/
 │   └── validator.go         # Валидация входных данных
 ```
 
-
+## Дальнейшее развитие
+Проект является достаточно простым и легко масштабируемым, поэтому в него можно без проблем вносить новые функциональности.
+Наиболее перспективными и полезными являются:
+* Внедрение сервиса электронного документооборота: загружается шаблон справки или заявления;
+пользователь запрашивает получение данного документа; бот выдает пользователю файл, подставляя в пустые поля необходимые данные (ФИО, группа, текущая дата)
+* Прикрепление документов к дисциплинам. Для преподавателей появится возможность загружать документы (задания лабораторных работ, методички, лекции) и прикреплять к своим дисциплинам.Студенты смогут посмотреть список доступных файлов и скачать нужный при необходимости.
+ 
 ## Команда
 | Роль | Имя | Контакт |
 |------|-----|---------|
-| Тимлид | Алибеков Аслан | [AlibekovAA](https://github.com/AlibekovAA) |
-| Backend | Василов Иван |  [VasilovIS](https://github.com/Feof1l)|
+| Тимлид/Техлид | Алибеков Аслан | [AlibekovAA](https://github.com/AlibekovAA) |
 | Аналитик | Ногеров Ислам | [NogerovIA](https://github.com/Samuel1-1) |
 
